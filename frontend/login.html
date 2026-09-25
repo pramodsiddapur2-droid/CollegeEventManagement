@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Login</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<header>
+    <h1>College Event Management System</h1>
+</header>
+
+<section id="admin">
+    <h2>Admin Login</h2>
+
+    <form onsubmit="login(event)">
+        <input type="text" id="username"
+               placeholder="Username" required>
+
+        <input type="password" id="password"
+               placeholder="Password" required>
+
+        <button type="submit">Login</button>
+    </form>
+
+    <p id="message"></p>
+</section>
+
+<script>
+function login(event)
+{
+    event.preventDefault();
+
+    let username = document.getElementById("username").value;
+    let password = document.getElementById("password").value;
+
+    if (username === "admin" && password === "1234")
+    {
+        window.location.href = "admin.html";
+    }
+    else
+    {
+        document.getElementById("message").innerText =
+            "Invalid username or password";
+    }
+}
+</script>
+
+</body>
+</html>

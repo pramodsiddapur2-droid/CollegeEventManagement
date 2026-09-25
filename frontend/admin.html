@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin - College Event Management</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<header>
+    <h1>College Event Management System</h1>
+
+    <nav>
+        <a href="index.html">Home</a>
+        <a href="admin.html">Admin</a>
+    </nav>
+</header>
+
+<section id="admin">
+    <h2>Registered Students</h2>
+
+   <h3>Total Registrations: <span id="count">0</span></h3>
+
+<button onclick="loadRegistrations()">Refresh Registrations</button>
+
+<h3>Event-wise Registrations</h3>
+<div id="eventCounts"></div>
+    <table>
+        <thead>
+            <tr>
+                <th>No.</th>
+<th>Name</th>
+<th>USN</th>
+<th>Email</th>
+<th>Event</th>
+            </tr>
+        </thead>
+
+        <tbody id="registrationTable">
+        </tbody>
+    </table>
+
+    <p id="message"></p>
+</section>
+
+<script>
+async function loadRegistrations()
+{
+    try
+    {
+        let response = await fetch(
+            "http://localhost:8080/registrations"
+        );
+
+        let registrations = await response.json();
+
+        // Total registrations
+        document.getElementById("count").innerText =
+            registrations.length;
+
+        // Registration table
+        let table = document.getElementById(
+            "registrationTable"
+        );
+
+        table.innerHTML = "";
+
+        registrations.forEach(function(student, index)
+        {
+            let row = `
+                <tr>
+                    <td>${index + 1}</td>
+                   <td>${student.name}</td>
+                   <td>${student.usn}</td>
+                    <td>${student.email}</td>
+                   <td>${student.event}</td>
+                </tr>
+            `;
+
+            table.innerHTML += row;
+        });
+
+        // Event-wise count
+        let eventCounts = {};
+
+        registrations.forEach(function(student)
+        {
+            if (eventCounts[student.event])
+            {
+                eventCounts[student.event]++;
+            }
+            else
+            {
+                eventCounts[student.event] = 1;
+            }
+        });
+
+        let countHTML = "";
+
+        for (let event in eventCounts)
+        {
+            countHTML += `
+                <p>
+                    <strong>${event}</strong> :
+                    ${eventCounts[event]} registrations
+                </p>
+            `;
+        }
+
+        document.getElementById("eventCounts").innerHTML =
+            countHTML;
+    }
+    catch(error)
+    {
+        document.getElementById("message").innerText =
+            "Unable to connect to backend.";
+    }
+}
+
+loadRegistrations();
+</script>
