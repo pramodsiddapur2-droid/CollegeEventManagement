@@ -1,31 +1,84 @@
 #include <iostream>
 #include <string>
-#include <fstream>
-#include <sstream>
+#include <cstdlib>
+#include <cstdio>
 #include "../httplib.h"
 
 using namespace std;
+
+string jsonEscape(string text)
+{
+    string result;
+
+    for (char c : text)
+    {
+        if (c == '"')
+            result += "\\\"";
+        else if (c == '\\')
+            result += "\\\\";
+        else
+            result += c;
+    }
+
+    return result;
+}
+
+string runCurl(string command)
+{
+    FILE* pipe = _popen(command.c_str(), "r");
+
+    if (!pipe)
+        return "";
+
+    char buffer[4096];
+    string result;
+
+    while (fgets(buffer, sizeof(buffer), pipe))
+    {
+        result += buffer;
+    }
+
+    _pclose(pipe);
+
+    return result;
+}
 
 int main()
 {
     httplib::Server server;
 
+    const char* key = getenv("SUPABASE_KEY");
+
+    if (key == nullptr)
+    {
+        cout << "SUPABASE_KEY not found!" << endl;
+        return 1;
+    }
+
+    string supabaseKey = key;
+
     // CORS
-    server.set_pre_routing_handler([](const httplib::Request& req, httplib::Response& res) {
-        res.set_header("Access-Control-Allow-Origin", "*");
-        res.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-        res.set_header("Access-Control-Allow-Headers", "Content-Type");
-
-        if (req.method == "OPTIONS")
+    server.set_pre_routing_handler(
+        [](const httplib::Request& req, httplib::Response& res)
         {
-            res.status = 200;
-            return httplib::Server::HandlerResponse::Handled;
+            res.set_header("Access-Control-Allow-Origin", "*");
+            res.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+            res.set_header(
+                "Access-Control-Allow-Headers",
+                "Content-Type, apikey, Authorization"
+            );
+
+            if (req.method == "OPTIONS")
+            {
+                res.status = 200;
+                return httplib::Server::HandlerResponse::Handled;
+            }
+
+            return httplib::Server::HandlerResponse::Unhandled;
         }
+    );
 
-        return httplib::Server::HandlerResponse::Unhandled;
-    });
-
-    // Home / test
+    // Home
     server.Get("/", [](const httplib::Request& req, httplib::Response& res)
     {
         res.set_content(
@@ -34,111 +87,89 @@ int main()
         );
     });
 
-    // Register student
-    server.Post("/register", [](const httplib::Request& req, httplib::Response& res)
-    {
-        string name = req.get_param_value("name");
-        string usn = req.get_param_value("usn");
-        string event = req.get_param_value("event");
-        string email = req.get_param_value("email");
-
-        ofstream file("registrations.txt", ios::app);
-
-        if (file.is_open())
+    // Register
+    server.Post("/register",
+        [&](const httplib::Request& req, httplib::Response& res)
         {
-           file << name << " | "
-     << usn << " | "
-     << email << " | "
-     << event << endl;
-            file.close();
+            string name = req.get_param_value("name");
+            string usn = req.get_param_value("usn");
+            string email = req.get_param_value("email");
+            string event = req.get_param_value("event");
 
-            res.set_content(
-                "Registration Successful!",
-                "text/plain"
-            );
+            string json =
+                "{"
+                "\"name\":\"" + jsonEscape(name) + "\","
+                "\"usn\":\"" + jsonEscape(usn) + "\","
+                "\"email\":\"" + jsonEscape(email) + "\","
+                "\"event\":\"" + jsonEscape(event) + "\""
+                "}";
+
+            string command =
+                "curl -s -X POST "
+                "\"https://roymcjogipzlbfztvzcy.supabase.co/rest/v1/registrations\" "
+                "-H \"apikey: " + supabaseKey + "\" "
+                "-H \"Authorization: Bearer " + supabaseKey + "\" "
+                "-H \"Content-Type: application/json\" "
+                "-H \"Prefer: return=minimal\" "
+                "--data-raw \"{\\\"name\\\":\\\"" + jsonEscape(name) +
+"\\\",\\\"usn\\\":\\\"" + jsonEscape(usn) +
+"\\\",\\\"email\\\":\\\"" + jsonEscape(email) +
+"\\\",\\\"event\\\":\\\"" + jsonEscape(event) + "\\\"}\"";
+string result = runCurl(command);
+
+if (result.empty())
+{
+    res.set_content(
+        "Registration Successful!",
+        "text/plain"
+    );
+}
+else
+{
+    res.status = 500;
+    res.set_content(
+        "Database Error: " + result,
+        "text/plain"
+    );
+}
+            
         }
-        else
+    );
+
+    // Get registrations
+    server.Get("/registrations",
+        [&](const httplib::Request& req, httplib::Response& res)
         {
-            res.status = 500;
-            res.set_content(
-                "Unable to save registration.",
-                "text/plain"
-            );
+            string command =
+                "curl -s "
+                "\"https://roymcjogipzlbfztvzcy.supabase.co/rest/v1/registrations"
+                "?select=id,name,usn,email,event,registered_at&order=id.asc\" "
+                "-H \"apikey: " + supabaseKey + "\" "
+                "-H \"Authorization: Bearer " + supabaseKey + "\"";
+
+            string result = runCurl(command);
+
+            if (result.empty())
+            {
+                res.status = 500;
+                res.set_content(
+                    "Unable to fetch registrations.",
+                    "text/plain"
+                );
+            }
+            else
+            {
+                res.set_content(
+                    result,
+                    "application/json"
+                );
+            }
         }
-    });
-
-    // Get all registrations
-    server.Get("/registrations", [](const httplib::Request& req, httplib::Response& res)
-    {
-        ifstream file("registrations.txt");
-
-        if (!file.is_open())
-        {
-            res.set_content("[]", "application/json");
-            return;
-        }
-
-        string line;
-        string json = "[";
-
-        bool first = true;
-
-        while (getline(file, line))
-        {
-            stringstream ss(line);
-
-           string name, usn, email, event;
-
-            getline(ss, name, '|');
-            getline(ss, usn, '|');
-            getline(ss, email, '|');
-            getline(ss, event);
-
-            // Remove extra spaces
-            if (!name.empty() && name.front() == ' ')
-    name.erase(0, 1);
-
-if (!name.empty() && name.back() == ' ')
-    name.pop_back();
-
-if (!usn.empty() && usn.front() == ' ')
-    usn.erase(0, 1);
-
-if (!usn.empty() && usn.back() == ' ')
-    usn.pop_back();
-
-if (!email.empty() && email.front() == ' ')
-    email.erase(0, 1);
-
-if (!email.empty() && email.back() == ' ')
-    email.pop_back();
-
-if (!event.empty() && event.front() == ' ')
-    event.erase(0, 1);
-
-if (!event.empty() && event.back() == ' ')
-    event.pop_back();
-
-            if (!first)
-                json += ",";
-
-           json += "{\"name\":\"" + name +
-        "\",\"usn\":\"" + usn +
-        "\",\"email\":\"" + email +
-        "\",\"event\":\"" + event + "\"}";
-            first = false;
-        }
-
-        json += "]";
-
-        res.set_content(json, "application/json");
-
-        file.close();
-    });
+    );
 
     cout << "==============================" << endl;
     cout << " COLLEGE EVENT MANAGEMENT" << endl;
-    cout << " Backend Server Started" << endl;
+    cout << " Supabase Backend Server" << endl;
     cout << " http://localhost:8080" << endl;
     cout << "==============================" << endl;
 

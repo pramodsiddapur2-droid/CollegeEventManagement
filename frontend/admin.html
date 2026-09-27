@@ -18,6 +18,9 @@
 
 <section id="admin">
     <h2>Registered Students</h2>
+    <input type="text" id="search"
+       placeholder="Search by name or USN"
+       onkeyup="searchStudents()">
 
    <h3>Total Registrations: <span id="count">0</span></h3>
 
@@ -54,14 +57,11 @@ async function loadRegistrations()
 
         let registrations = await response.json();
 
-        // Total registrations
         document.getElementById("count").innerText =
             registrations.length;
 
-        // Registration table
-        let table = document.getElementById(
-            "registrationTable"
-        );
+        let table =
+            document.getElementById("registrationTable");
 
         table.innerHTML = "";
 
@@ -70,29 +70,24 @@ async function loadRegistrations()
             let row = `
                 <tr>
                     <td>${index + 1}</td>
-                   <td>${student.name}</td>
-                   <td>${student.usn}</td>
+                    <td>${student.name}</td>
+                    <td>${student.usn}</td>
                     <td>${student.email}</td>
-                   <td>${student.event}</td>
+                    <td>${student.event}</td>
                 </tr>
             `;
 
             table.innerHTML += row;
         });
 
-        // Event-wise count
         let eventCounts = {};
 
         registrations.forEach(function(student)
         {
             if (eventCounts[student.event])
-            {
                 eventCounts[student.event]++;
-            }
             else
-            {
                 eventCounts[student.event] = 1;
-            }
         });
 
         let countHTML = "";
@@ -117,5 +112,42 @@ async function loadRegistrations()
     }
 }
 
+function searchStudents()
+{
+    let search =
+        document.getElementById("search").value.toLowerCase();
+
+    let rows =
+        document.querySelectorAll("#registrationTable tr");
+
+    rows.forEach(function(row)
+    {
+        let name = row.cells[1].innerText.toLowerCase();
+        let usn = row.cells[2].innerText.toLowerCase();
+
+        if (name.includes(search) || usn.includes(search))
+            row.style.display = "";
+        else
+            row.style.display = "none";
+    });
+}
+
 loadRegistrations();
 </script>
+function searchStudents()
+{
+    let search = document.getElementById("search").value.toLowerCase();
+
+    let rows = document.querySelectorAll("#registrationTable tr");
+
+    rows.forEach(function(row)
+    {
+        let name = row.cells[1].innerText.toLowerCase();
+        let usn = row.cells[2].innerText.toLowerCase();
+
+        if (name.includes(search) || usn.includes(search))
+            row.style.display = "";
+        else
+            row.style.display = "none";
+    });
+}
