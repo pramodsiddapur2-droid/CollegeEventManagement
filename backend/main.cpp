@@ -173,7 +173,12 @@ else
     cout << " http://localhost:8080" << endl;
     cout << "==============================" << endl;
 
-    server.listen("localhost", 8080);
+     int port = 8080;
+
+if (const char* env_port = getenv("PORT"))
+    port = stoi(env_port);
+
+server.listen("0.0.0.0", port);
 
     return 0;
 }
